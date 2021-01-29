@@ -6,8 +6,8 @@
 # docker-theme-check
 A linter for Shopify Themes by Docker.
 
-For more information on how to use theme-check,
-please check the official repository.
+For more information on how to use theme-check,  
+please check the official repository.  
 https://github.com/shopify/theme-check
 
 # Examples
