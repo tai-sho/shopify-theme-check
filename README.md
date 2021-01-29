@@ -6,10 +6,11 @@
 # docker-theme-check
 A linter for Shopify Themes by Docker.
 
-Base image  
+For more information on how to use theme-check,
+please check the official repository.
 https://github.com/shopify/theme-check
 
-# Example
+# Examples
 ## Gitlab-CI
 ```yml
 stages:
