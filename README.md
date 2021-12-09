@@ -11,6 +11,11 @@ please check the official repository.
 https://github.com/shopify/theme-check
 
 # Examples
+## Local
+```
+$ docker run -it --rm -v `pwd`:/tmp shouheitai/shopify-theme-check theme-check .
+```
+
 ## GitHub Actions
 ```yml
 name: github CI
