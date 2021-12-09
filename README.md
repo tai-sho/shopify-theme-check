@@ -12,7 +12,7 @@ https://github.com/shopify/theme-check
 
 # Examples
 ## Local
-```
+```bash
 $ docker run -it --rm -v `pwd`:/tmp shouheitai/shopify-theme-check theme-check .
 ```
 
