@@ -1,4 +1,4 @@
-FROM ruby:2.7.2-alpine
+FROM ruby:2.7.5-alpine
 
 WORKDIR /tmp
 RUN apk add --no-cache build-base libxml2-dev libxslt-dev
