@@ -1,0 +1,98 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *'  # 毎日0時に実行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Extract Ruby Version
+      id: extract_ruby_version
+      run: |
+        latest_ruby_version=$(curl -s https://raw.githubusercontent.com/docker-library/ruby/master/alpine/Dockerfile | grep -oP 'FROM ruby:\K[^\s-]+(?=-alpine)')
+        echo "RUBY_VERSION=${latest_ruby_version}" >> $GITHUB_ENV
+
+    - name: Extract Shopify Theme Check Version
+      id: extract_theme_check_version
+      run: |
+        theme_check_version=$(curl -s https://rubygems.org/api/v1/versions/theme-check/latest.json | jq -r .version)
+        echo "THEME_CHECK_VERSION=${theme_check_version}" >> $GITHUB_ENV
+
+    - name: Check for version updates
+      run: |
+        current_ruby_version=$(grep -oP '^FROM ruby:\K[^\s-]+' Dockerfile)
+        current_theme_check_version=$(grep -oP 'gem install theme-check -v \K[^ ]+' Dockerfile)
+        echo "Current Ruby version: $current_ruby_version"
+        echo "Current Theme Check version: $current_theme_check_version"
+        echo "Latest Ruby version: ${{ env.RUBY_VERSION }}"
+        echo "Latest Theme Check version: ${{ env.THEME_CHECK_VERSION }}"
+        if [ "$current_ruby_version" != "${{ env.RUBY_VERSION }}" ] || [ "$current_theme_check_version" != "${{ env.THEME_CHECK_VERSION }}" ]; then
+          echo "Versions have changed."
+          echo "UPDATE_REQUIRED=true" >> $GITHUB_ENV
+        else
+          echo "Versions are up to date."
+          echo "UPDATE_REQUIRED=false" >> $GITHUB_ENV
+        fi
+
+    - name: Update Dockerfile
+      if: env.UPDATE_REQUIRED == 'true'
+      run: |
+        sed -i "s/^FROM ruby:.*/FROM ruby:${{ env.RUBY_VERSION }}-alpine/" Dockerfile
+        sed -i "s/^RUN gem install theme-check -v .*/RUN gem install theme-check -v ${{ env.THEME_CHECK_VERSION }}/" Dockerfile
+
+    - name: Commit changes
+      if: env.UPDATE_REQUIRED == 'true'
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add Dockerfile
+        git commit -m "Update Dockerfile to Ruby ${{ env.RUBY_VERSION }} and Theme Check ${{ env.THEME_CHECK_VERSION }}"
+        git tag -a "v${{ env.THEME_CHECK_VERSION }}" -m "Version ${{ env.THEME_CHECK_VERSION }}"
+        git push origin main --tags
+
+    - name: Build and push
+      if: env.UPDATE_REQUIRED == 'true'
+      run: |
+        docker buildx build --push --tag your-dockerhub-username/shopify-theme-check:${{ env.THEME_CHECK_VERSION }} .
+        docker buildx build --push --tag your-dockerhub-username/shopify-theme-check:latest .
+
+    - name: Create Release
+      if: env.UPDATE_REQUIRED == 'true'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.THEME_CHECK_VERSION }}
+        release_name: Release ${{ env.THEME_CHECK_VERSION }}
+        draft: false
+        prerelease: false
+
